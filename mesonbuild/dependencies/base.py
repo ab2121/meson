@@ -28,9 +28,11 @@ import platform
 import typing as T
 from enum import Enum
 from pathlib import Path, PurePath
+import collections
 
 from .. import mlog
 from .. import mesonlib
+from .. import common
 from ..compilers import clib_langs
 from ..environment import Environment, MachineInfo
 from ..cmake import CMakeExecutor, CMakeTraceParser, CMakeException, CMakeToolchain, CMakeExecScope, check_cmake_args
@@ -50,6 +52,9 @@ _packages_accept_language = set()
 
 class DependencyException(MesonException):
     '''Exceptions raised while trying to find dependencies'''
+
+def stringifyUserArguments(args):
+    return common.stringifyUserArguments(args, DependencyException())
 
 
 class DependencyMethods(Enum):
@@ -577,6 +582,18 @@ class PkgConfigDependency(ExternalDependency):
         super().__init__('pkgconfig', environment, kwargs, language=language)
         self.name = name
         self.is_libtool = False
+
+        # Modules param support
+        # Extract and validate modules
+        self.modules = mesonlib.extract_as_list(kwargs, 'modules')  # type: T.List[str]
+        for i in self.modules:
+            if not isinstance(i, str):
+                raise DependencyException('Dependency module argument is not a string.')
+
+        # Copy list. Save specified modules for advance to check wether we found all modules.
+        # We will remove by one if we found an item
+        self.modules_missing = list(self.modules)  # type: T.List[str]
+        
         # Store a copy of the pkg-config path on the object itself so it is
         # stored in the pickled coredata and recovered.
         self.pkgbin = None
@@ -804,6 +821,7 @@ class PkgConfigDependency(ExternalDependency):
         # Generate link arguments for this library
         link_args = []
         for lib in full_args:
+            libname = None
             if lib.startswith(('-L-l', '-L-L')):
                 # These are D language arguments, add them as-is
                 pass
@@ -814,6 +832,14 @@ class PkgConfigDependency(ExternalDependency):
                 # Don't resolve the same -lfoo argument again
                 if lib in libs_found:
                     continue
+
+                # Modules param support
+                # Add libs specified in 'modules' arg, if it is
+                # otherwise add all libs (keep default behaivour)
+                libname = lib[2:]
+                if self.modules and libname not in self.modules:
+                    continue
+
                 if self.clib_compiler:
                     args = self.clib_compiler.find_library(lib[2:], self.env,
                                                            libpaths, libtype)
@@ -860,6 +886,10 @@ class PkgConfigDependency(ExternalDependency):
                 if lib in link_args:
                     continue
             link_args.append(lib)
+            # Modules param support
+            # Remove found lib from missing modules (user modules arg) list
+            if self.modules_missing and libname is not None:
+                self.modules_missing.remove(libname)
         # Add all -Lbar args if we have -lfoo args in link_args
         if libs_notfound:
             # Order of -L flags doesn't matter with ld, but it might with other
@@ -892,6 +922,11 @@ class PkgConfigDependency(ExternalDependency):
             raise DependencyException('Could not generate libs for %s:\n\n%s' %
                                       (self.name, out_raw))
         self.link_args, self.raw_link_args = self._search_libs(out, out_raw)
+
+        # Modules param support
+        if self.modules_missing:
+            raise DependencyException('Could not find libs for arg modules: %s' %
+                                      (stringifyUserArguments(self.modules_missing)))
 
     def get_pkgconfig_variable(self, variable_name: str, kwargs: T.Dict[str, T.Any]) -> str:
         options = ['--variable=' + variable_name, self.name]
@@ -991,6 +1026,13 @@ class PkgConfigDependency(ExternalDependency):
 
     def log_tried(self):
         return self.type_name
+
+    # Modules param support
+    # prints modules specified in module parameter
+    def log_details(self) -> str:
+        if self.modules:
+            return 'modules: ' + ', '.join(self.modules)
+        return ''
 
     def get_variable(self, *, cmake: T.Optional[str] = None, pkgconfig: T.Optional[str] = None,
                      configtool: T.Optional[str] = None, internal: T.Optional[str] = None,
@@ -2352,7 +2394,10 @@ class DependencyFactory:
 
 def get_dep_identifier(name, kwargs) -> T.Tuple:
     identifier = (name, )
-    for key, value in kwargs.items():
+    # Modules param support
+    # FIX unordered items in the identifier
+    ordered_kwargs = collections.OrderedDict(sorted(kwargs.items(), key=lambda t: t[0]))
+    for key, value in ordered_kwargs.items():
         # 'version' is irrelevant for caching; the caller must check version matches
         # 'native' is handled above with `for_machine`
         # 'required' is irrelevant for caching; the caller handles it separately

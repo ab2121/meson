@@ -21,6 +21,7 @@ from . import optinterpreter
 from . import compilers
 from .wrap import wrap, WrapMode
 from . import mesonlib
+from . import common
 from .mesonlib import FileMode, MachineChoice, OptionKey, Popen_safe, listify, extract_as_list, has_path_sep, unholder
 from .dependencies import ExternalProgram
 from .dependencies import InternalDependency, Dependency, NotFoundDependency, DependencyException
@@ -62,16 +63,7 @@ permitted_method_kwargs = {
 }
 
 def stringifyUserArguments(args):
-    if isinstance(args, list):
-        return '[%s]' % ', '.join([stringifyUserArguments(x) for x in args])
-    elif isinstance(args, dict):
-        return '{%s}' % ', '.join(['%s : %s' % (stringifyUserArguments(k), stringifyUserArguments(v)) for k, v in args.items()])
-    elif isinstance(args, int):
-        return str(args)
-    elif isinstance(args, str):
-        return "'%s'" % args
-    raise InvalidArguments('Function accepts only strings, integers, lists and lists thereof.')
-
+    return common.stringifyUserArguments(args, InvalidArguments())
 
 class OverrideProgram(dependencies.ExternalProgram):
     pass
@@ -3602,7 +3594,11 @@ external dependencies (including libraries) must go to "dependencies".''')
         if cached_dep:
             if found_vers:
                 info = [mlog.normal_cyan(found_vers), *info]
-            mlog.log('Dependency', mlog.bold(display_name),
+            # Modules param support
+            details = cached_dep.log_details()
+            if details:
+                details = '(' + details + ') '
+            mlog.log('Dependency', mlog.bold(display_name), details +
                      'found:', mlog.green('YES'), *info)
             return identifier, cached_dep
 
