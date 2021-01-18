@@ -2,9 +2,9 @@
 
 def stringifyUserArguments(args, ex):
     if isinstance(args, list):
-        return '[%s]' % ', '.join([stringifyUserArguments(x) for x in args])
+        return '[%s]' % ', '.join([stringifyUserArguments(x, ex) for x in args])
     elif isinstance(args, dict):
-        return '{%s}' % ', '.join(['%s : %s' % (stringifyUserArguments(k), stringifyUserArguments(v)) for k, v in args.items()])
+        return '{%s}' % ', '.join(['%s : %s' % (stringifyUserArguments(k, ex), stringifyUserArguments(v, ex)) for k, v in args.items()])
     elif isinstance(args, int):
         return str(args)
     elif isinstance(args, str):
