@@ -3595,9 +3595,11 @@ external dependencies (including libraries) must go to "dependencies".''')
             if found_vers:
                 info = [mlog.normal_cyan(found_vers), *info]
             # Modules param support
-            details = cached_dep.log_details()
-            if details:
-                details = '(' + details + ') '
+            details = ''
+            if hasattr(cached_dep, 'log_details'):
+                details = cached_dep.log_details()
+                if details:
+                    details = '(' + details + ') '
             mlog.log('Dependency', mlog.bold(display_name), details +
                      'found:', mlog.green('YES'), *info)
             return identifier, cached_dep
