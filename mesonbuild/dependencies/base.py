@@ -584,15 +584,20 @@ class PkgConfigDependency(ExternalDependency):
         self.is_libtool = False
 
         # Modules param support
-        # Extract and validate modules
-        self.modules = mesonlib.extract_as_list(kwargs, 'modules')  # type: T.List[str]
-        for i in self.modules:
-            if not isinstance(i, str):
-                raise DependencyException('Dependency module argument is not a string.')
-
-        # Copy list. Save specified modules for advance to check wether we found all modules.
-        # We will remove by one if we found an item
-        self.modules_missing = list(self.modules)  # type: T.List[str]
+        if 'modules' in kwargs:
+            # Extract and validate modules
+            self.modules = mesonlib.extract_as_list(kwargs, 'modules')  # type: T.List[str]
+            for i in self.modules:
+                if not isinstance(i, str):
+                    raise DependencyException('Dependency module argument is not a string.')
+    
+            # Copy list. Save specified modules for advance to check wether we found all modules.
+            # We will remove by one if we found an item
+            self.modules_missing = list(self.modules)  # type: T.List[str]
+        else:
+            # For default behaiviour (include all libs)
+            self.modules = None
+            self.modules_missing = None
         
         # Store a copy of the pkg-config path on the object itself so it is
         # stored in the pickled coredata and recovered.
@@ -835,8 +840,14 @@ class PkgConfigDependency(ExternalDependency):
 
                 # Modules param support
                 # Add libs specified in 'modules' arg, if it is
-                # otherwise add all libs (keep default behaivour)
+                # If modules is empty it is header only don't add libs
+                # If modules is None add all libs (keep default behaivour)
                 libname = lib[2:]
+                
+                # If modules is empty [] that it is header only
+                if self.modules is not None and not self.modules:
+                    continue
+                
                 if self.modules and libname not in self.modules:
                     continue
 
