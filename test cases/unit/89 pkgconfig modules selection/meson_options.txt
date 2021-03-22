@@ -1,0 +1,1 @@
+option('case_num', type : 'integer', min : 0, max : 6, value : 0)

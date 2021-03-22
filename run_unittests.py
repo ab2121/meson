@@ -6636,6 +6636,31 @@ class LinuxlikeTests(BasePlatformTests):
                         self.assertLess(line.index(first), line.index(second))
                     return
         raise RuntimeError('Linker entries not found in the Ninja file.')
+    
+    @skipIfNoPkgconfig
+    def test_pkg_config_modules_selection(self):
+        testdir = os.path.join(self.unit_test_dir, '89 pkgconfig modules selection')
+        expected_res = (
+          '-Wl,--start-group -lfoo1 -lfoo2 -lfoo3 -lfoo4 -lfoo5 -Wl,--end-group',
+          '-Wl,--start-group -lfoo1 -Wl,--end-group',
+          '-Wl,--start-group -lfoo1 -lfoo2 -Wl,--end-group',
+          '-Wl,--start-group -lfoo3 -Wl,--end-group',
+          '-Wl,--start-group -lfoo4 -lfoo5 -Wl,--end-group',
+          '-Wl,--start-group -lfoo5 -Wl,--end-group',
+          '-Wl,--start-group -lfoo1 -lfoo3 -lfoo5 -Wl,--end-group',
+          )
+        
+        for case in range (0, len(expected_res) - 1):
+            self.init(testdir, override_envvars={'PKG_CONFIG_PATH': testdir}, extra_args = [f'-Dcase_num={case}'])
+            found = False
+            with open(os.path.join(self.builddir, 'build.ninja')) as ifile:
+                for line in ifile:
+                    if line.find(expected_res[case]) != -1:
+                        found = True
+                        break
+            if not found:
+                raise RuntimeError(f'Linker entries not found in the Ninja file: {expected_res[case]}')
+            self.wipe()
 
     def test_introspect_dependencies(self):
         '''
