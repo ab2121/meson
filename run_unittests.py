@@ -6650,7 +6650,7 @@ class LinuxlikeTests(BasePlatformTests):
           '-Wl,--start-group -lfoo1 -lfoo3 -lfoo5 -Wl,--end-group',
           )
         
-        for case in range (0, len(expected_res) - 1):
+        for case in range (len(expected_res)):
             self.init(testdir, override_envvars={'PKG_CONFIG_PATH': testdir}, extra_args = [f'-Dcase_num={case}'])
             found = False
             with open(os.path.join(self.builddir, 'build.ninja')) as ifile:
@@ -6661,6 +6661,14 @@ class LinuxlikeTests(BasePlatformTests):
             if not found:
                 raise RuntimeError(f'Linker entries not found in the Ninja file: {expected_res[case]}')
             self.wipe()
+        
+        # Case for empty modules[] - deps is header only
+        self.init(testdir, override_envvars={'PKG_CONFIG_PATH': testdir}, extra_args = [f'-Dcase_num=7'])
+        with open(os.path.join(self.builddir, 'build.ninja')) as ifile:
+            for line in ifile:
+                if line.find('-lfoo') != -1:
+                    raise RuntimeError(f'Linker entries found in the Ninja file')
+        self.wipe()
 
     def test_introspect_dependencies(self):
         '''

@@ -844,7 +844,7 @@ class PkgConfigDependency(ExternalDependency):
                 # If modules is None add all libs (keep default behaivour)
                 libname = lib[2:]
                 
-                # If modules is empty [] that it is header only
+                # If modules is empty [] that it is a header only
                 if self.modules is not None and not self.modules:
                     continue
                 

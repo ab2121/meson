@@ -16,6 +16,8 @@ elif case_num == 5
   dep_mods = dependency('modules', modules : ['foo5'])
 elif case_num == 6
   dep_mods = dependency('modules', modules : ['foo1', 'foo3', 'foo5'])
+elif case_num == 7
+  dep_mods = dependency('modules', modules : []) #header only
 else
   error('not supported case')
 endif
